@@ -1,11 +1,19 @@
 package main
 
-import "ConcurrentLogProcessor/processors"
+import (
+	"ConcurrentLogProcessor/handler"
+	"fmt"
+	"log"
+	"net/http"
+)
 
 func main() {
-	filePth := "log.txt"
-	keywords := []string{"INFO", "error", "debug"}
+	http.HandleFunc("/process-logs", handler.ProcessLogsHandler)
+	fmt.Println("Server started at :8080")
 
-	processors.ProcessLogFile(filePth, keywords)
-
+	err := http.ListenAndServe(":8099", nil)
+	if err != nil {
+		log.Println(err)
+		return
+	}
 }

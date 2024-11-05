@@ -3,7 +3,7 @@ package processors
 import (
 	"fmt"
 	"io"
-	"os"
+	"mime/multipart"
 	"sort"
 	"strings"
 	"sync"
@@ -14,26 +14,24 @@ type Output struct {
 	Value int
 }
 
-func ProcessLogFile(filepath string, keywords []string) {
-	file, err := os.Open(filepath)
-	if err != nil {
-		fmt.Printf("Error opening file: %v\n", err)
-		return
-	}
+func ProcessLogFile(file multipart.File, keywords []string) ([]Output, error) {
 	chunkSize := 4096
 	defer file.Close()
 
-	fileInfo, err := file.Stat()
+	size, err := file.Seek(0, io.SeekEnd)
 	if err != nil {
-		fmt.Printf("Error getting file info: %v\n", err)
-		return
+		return nil, fmt.Errorf("Error determining file size: %v\n", err)
 	}
-	fileSize := fileInfo.Size()
+
+	_, err = file.Seek(0, io.SeekStart)
+	if err != nil {
+		return nil, fmt.Errorf("Error resetting file pointer: %v\n", err)
+	}
 
 	results := make(chan map[string]int)
 	var wg sync.WaitGroup
 
-	for offset := int64(0); offset < fileSize; offset += int64(chunkSize) {
+	for offset := int64(0); offset < size; offset += int64(chunkSize) {
 		wg.Add(1)
 		go CountKeywords(file, offset, chunkSize, keywords, results, &wg)
 	}
@@ -54,14 +52,10 @@ func ProcessLogFile(filepath string, keywords []string) {
 	}
 
 	sortedMap := sortMapDescending(totalCounts)
-
-	for _, output := range sortedMap {
-		fmt.Printf("%s: %d\n", output.Key, output.Value)
-	}
-
+	return sortedMap, nil
 }
 
-func CountKeywords(file *os.File, offset int64, chunkSize int, keywords []string, results chan map[string]int, wg *sync.WaitGroup) {
+func CountKeywords(file multipart.File, offset int64, chunkSize int, keywords []string, results chan map[string]int, wg *sync.WaitGroup) {
 	defer wg.Done()
 	buffer := make([]byte, chunkSize)
 
