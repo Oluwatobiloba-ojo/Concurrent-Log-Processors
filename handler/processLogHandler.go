@@ -27,6 +27,11 @@ func ProcessLogsHandler(w http.ResponseWriter, r *http.Request) {
 
 	outputs, err := processors.ProcessLogFile(file, keywords)
 
+	if err != nil {
+		http.Error(w, "Error processing the file", http.StatusBadRequest)
+		return
+	}
+
 	var result []map[string]interface{}
 
 	for _, output := range outputs {
